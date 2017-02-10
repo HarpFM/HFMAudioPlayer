@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
     
     s.name             = 'HFMAudioPlayer'
-    s.version          = '0.1.1'
+    s.version          = '0.2.0'
     
     s.author           = { 'Brian Drelling' => 'brian@harp.fm' }
     s.homepage         = 'https://github.com/HarpFM/HFMAudioPlayer'
