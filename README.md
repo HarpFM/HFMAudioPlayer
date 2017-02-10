@@ -64,7 +64,8 @@ To be added.
 
 ## Coming Soon
 
-- Add AudioManager for the easiest possible integration.
+- Add HFMAudioManager for the easiest possible integration.
+- Add more HFMAudioManagerDelegate options for download requests and other utilities.
 - Create formatter for NowPlayingInfo.
 - Make most functions throw comprehensive errors where possible.
 - Add further debug logging.
