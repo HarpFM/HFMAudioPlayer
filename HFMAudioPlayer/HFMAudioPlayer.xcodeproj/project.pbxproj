@@ -12,7 +12,9 @@
 		D3560DDE1E4CE4A600BBF967 /* HFMAudioPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D3560DD41E4CE4A600BBF967 /* HFMAudioPlayer.framework */; };
 		D3560DE31E4CE4A600BBF967 /* HFMAudioPlayerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3560DE21E4CE4A600BBF967 /* HFMAudioPlayerTests.swift */; };
 		D3560DE51E4CE4A600BBF967 /* HFMAudioPlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = D3560DD71E4CE4A600BBF967 /* HFMAudioPlayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		D3560DF11E4CE78400BBF967 /* HFMAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3560DF01E4CE78400BBF967 /* HFMAudioPlayer.swift */; };
+		D3876CC01E4D8481005BD449 /* HFMAudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3876CBD1E4D8481005BD449 /* HFMAudioManager.swift */; };
+		D3876CC11E4D8481005BD449 /* HFMAudioManagerDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3876CBE1E4D8481005BD449 /* HFMAudioManagerDelegate.swift */; };
+		D3876CC21E4D8481005BD449 /* HFMAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3876CBF1E4D8481005BD449 /* HFMAudioPlayer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,7 +40,9 @@
 		D3560DDD1E4CE4A600BBF967 /* HFMAudioPlayerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HFMAudioPlayerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3560DE21E4CE4A600BBF967 /* HFMAudioPlayerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HFMAudioPlayerTests.swift; sourceTree = "<group>"; };
 		D3560DE41E4CE4A600BBF967 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		D3560DF01E4CE78400BBF967 /* HFMAudioPlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HFMAudioPlayer.swift; sourceTree = "<group>"; };
+		D3876CBD1E4D8481005BD449 /* HFMAudioManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HFMAudioManager.swift; sourceTree = "<group>"; };
+		D3876CBE1E4D8481005BD449 /* HFMAudioManagerDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HFMAudioManagerDelegate.swift; sourceTree = "<group>"; };
+		D3876CBF1E4D8481005BD449 /* HFMAudioPlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HFMAudioPlayer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -105,9 +109,10 @@
 		D3560DD61E4CE4A600BBF967 /* HFMAudioPlayer */ = {
 			isa = PBXGroup;
 			children = (
-				D3560DD81E4CE4A600BBF967 /* Info.plist */,
 				D3560DD71E4CE4A600BBF967 /* HFMAudioPlayer.h */,
-				D3560DF01E4CE78400BBF967 /* HFMAudioPlayer.swift */,
+				D3560DD81E4CE4A600BBF967 /* Info.plist */,
+				D3876CB91E4D843E005BD449 /* Core */,
+				D3876CBA1E4D8450005BD449 /* Support */,
 			);
 			path = HFMAudioPlayer;
 			sourceTree = "<group>";
@@ -119,6 +124,23 @@
 				D3560DE41E4CE4A600BBF967 /* Info.plist */,
 			);
 			path = HFMAudioPlayerTests;
+			sourceTree = "<group>";
+		};
+		D3876CB91E4D843E005BD449 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				D3876CBD1E4D8481005BD449 /* HFMAudioManager.swift */,
+				D3876CBE1E4D8481005BD449 /* HFMAudioManagerDelegate.swift */,
+				D3876CBF1E4D8481005BD449 /* HFMAudioPlayer.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		D3876CBA1E4D8450005BD449 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Support;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -317,7 +339,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D3560DF11E4CE78400BBF967 /* HFMAudioPlayer.swift in Sources */,
+				D3876CC01E4D8481005BD449 /* HFMAudioManager.swift in Sources */,
+				D3876CC11E4D8481005BD449 /* HFMAudioManagerDelegate.swift in Sources */,
+				D3876CC21E4D8481005BD449 /* HFMAudioPlayer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,6 +1,6 @@
 //
 //  HFMAudioPlayer.swift
-//  Harp
+//  HarpFM
 //
 //  Created by Brian Drelling on 10/28/16.
 //  Copyright © 2016 Brian Drelling. All rights reserved.
