@@ -1,3 +1,5 @@
+![HFMAudioPlayer](https://firebasestorage.googleapis.com/v0/b/harpfm-71ead.appspot.com/o/HFMAudioPlayerBanner.png?alt=media&token=e1622373-2cb4-4bab-acb5-93cb9b87d4b6)
+
 ![Travis CI](https://travis-ci.org/HarpFM/HFMAudioPlayer.svg?branch=master)
 [![CocoaPods Compatible](https://img.shields.io/cocoapods/v/HFMAudioPlayer.svg)](https://cocoapods.org/pods/HFMAudioPlayer)
 [![Platform](https://img.shields.io/cocoapods/p/HFMAudioPlayer.svg)](http://cocoadocs.org/docsets/HFMAudioPlayer)
