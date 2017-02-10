@@ -68,6 +68,7 @@ To be added.
 - Create formatter for NowPlayingInfo.
 - Make most functions throw comprehensive errors where possible.
 - Add further debug logging.
+- Add better documentation.
 
 ## Communication
 
