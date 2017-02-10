@@ -64,7 +64,10 @@ To be added.
 
 ## Coming Soon
 
-No features planned for implementation at this time.
+- Add AudioManager for the easiest possible integration.
+- Create formatter for NowPlayingInfo.
+- Make most functions throw comprehensive errors where possible.
+- Add further debug logging.
 
 ## Communication
 
