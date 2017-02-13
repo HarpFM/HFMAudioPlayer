@@ -70,6 +70,7 @@ To be added.
 - Make most functions throw comprehensive errors where possible.
 - Add further debug logging.
 - Add better documentation.
+- Move the starting of AudioSession and RemoteCommandHandlers out of init() and let the user decide when to start it (as well as session category).
 
 ## Communication
 

@@ -10,14 +10,14 @@ import AVFoundation
 import Foundation
 import MediaPlayer
 
-class AudioManager {
+open class HFMAudioManager: HFMAudioManagerDelegate {
     // MARK: - Shared Instance
     
-    private static var _shared: AudioManager!
+    private static var _shared: HFMAudioManager!
     
-    static var shared: AudioManager {
+    open class var shared: HFMAudioManager {
         if (self._shared == nil) {
-            self._shared = AudioManager()
+            self._shared = HFMAudioManager()
         }
         
         return self._shared
@@ -25,22 +25,22 @@ class AudioManager {
     
     // MARK: - Enums
     
-    enum SkipDirection {
+    public enum SkipDirection {
         case backward
         case forward
     }
     
     // MARK: - Properties
     
-    public var delegate: HFMAudioManagerDelegate?
-    public var player: HFMAudioPlayer?
+    open var delegate: HFMAudioManagerDelegate?
+    open var isDebugEnabled = false
+    open var supportedPlaybackRates: [NSNumber] = [1, 1.5, 2]
+    open var preferredSkipBackwardIntervals: [NSNumber] = [-15, -30]
+    open var preferredSkipForwardIntervals: [NSNumber] = [15, 30]
+    open var syncInterval: TimeInterval?
+    open var updateInterval: TimeInterval = 1
     
-    public var isDebugEnabled = false
-    public var supportedPlaybackRates: [NSNumber] = [1, 1.5, 2]
-    public var preferredSkipBackwardIntervals: [NSNumber] = [-15, -30]
-    public var preferredSkipForwardIntervals: [NSNumber] = [15, 30]
-    public var syncInterval: TimeInterval = 15
-    public var updateInterval: TimeInterval = 1
+    final public var player: HFMAudioPlayer?
     
     public var shouldPauseWhenExternalDeviceChanges = true {
         didSet {
@@ -52,13 +52,14 @@ class AudioManager {
         }
     }
     
+    private var timeSinceLastSync: TimeInterval = 0
     private var updateTimer: Timer?
     
     // MARK: - Methods
     
     // MARK: Initializers
     
-    init() {
+    public init() {
         do {
             try AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryPlayback)
             try AVAudioSession.sharedInstance().setActive(false)
@@ -67,11 +68,15 @@ class AudioManager {
         }
         
         self.addRemoteCommandHandlers()
+        
+        self.delegate = self
+        self.delegate?.setProperties()
     }
     
     // MARK: Events
     
-    @objc func onAudioSessionRouteChanged(notification: Notification) {
+    @objc
+    private func onAudioSessionRouteChanged(notification: Notification) {
         guard let routeChangeReasonInt = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
             let routeChangeReason = AVAudioSessionRouteChangeReason(rawValue: routeChangeReasonInt) else {
                 return
@@ -84,61 +89,62 @@ class AudioManager {
     
     // MARK: Player Commands
     
-    func pause() {
+    open func pause() {
         self.player?.pause()
         
         if (self.isDebugEnabled) {
             print("Playback paused.")
         }
         
-        self.stopTimers()
+        self.stopTimer()
         
-        self.requestAudioPlayerUpdate()
+        self.requestAudioPlayerUpdate(shouldUpdateNowPlayingInfo: true)
     }
     
-    func play() {
+    open func play() {
         self.player?.play()
         
         if (self.isDebugEnabled) {
             print("Playback started.")
         }
         
-        self.startTimers()
+//        try? self.setActive(true)
+        self.startTimer()
         
-        self.requestAudioPlayerUpdate()
+        self.requestAudioPlayerUpdate(shouldUpdateNowPlayingInfo: true)
     }
     
-    func seek(to time: TimeInterval) {
-        self.player?.seek(to: time)
+    open func seek(to time: TimeInterval) {
+        self.player?.seek(to: time) { [weak self] in
+            self?.requestAudioPlayerUpdate(shouldUpdateNowPlayingInfo: true)
+        }
         
         if (self.isDebugEnabled) {
             print("Playback seeked to \(time).")
         }
-        
-        self.requestAudioPlayerUpdate()
     }
     
-    func setPlaybackRate(to rate: Float) {
+    open func setPlaybackRate(to rate: Float) {
         self.player?.setPlaybackRate(to: rate)
         
         if (self.isDebugEnabled) {
             print("Playback rate set to \(rate).")
         }
         
-        self.requestAudioPlayerUpdate()
+        self.requestAudioPlayerUpdate(shouldUpdateNowPlayingInfo: true)
     }
     
-    func skip(by seconds: TimeInterval) {
-        self.player?.skip(by: seconds)
+    open func skip(by seconds: TimeInterval) {
+        self.player?.skip(by: seconds) { [weak self] in
+            self?.requestAudioPlayerUpdate(shouldUpdateNowPlayingInfo: true)
+        }
         
         if (self.isDebugEnabled) {
             print("Playback skipped backward by \(seconds) seconds.")
         }
-        
-        self.requestAudioPlayerUpdate()
     }
     
-    func skip(_ direction: SkipDirection) {
+    open func skip(_ direction: SkipDirection) {
         switch (direction) {
         case .backward:
             self.skip(by: -15)
@@ -147,36 +153,125 @@ class AudioManager {
         }
     }
     
-    func stop() {
+    open func stop() {
         self.player?.stop()
         
         if (self.isDebugEnabled) {
             print("Playback stopped.")
         }
         
-        self.stopTimers()
+        self.stopTimer()
         
-        self.requestAudioPlayerUpdate()
+        self.requestAudioPlayerUpdate(shouldUpdateNowPlayingInfo: true)
         
         try? self.setActive(false)
     }
     
-    @discardableResult
-    func togglePlayPause() -> Bool {
-        guard let player = self.player else {
-            return false
-        }
-        
-        if (player.isPlaying) {
+    open func togglePlayPause() {
+        if (player?.isPlaying != false) {
             self.pause()
         } else {
             self.play()
         }
-        
-        return player.isPlaying
     }
     
-    // MARK: Utilities
+    // MARK: Utilities (Public)
+    
+    @discardableResult
+    final public func prepareToPlay(filePath: String?, time: TimeInterval? = nil, persist: Bool = false) throws -> Bool {
+        guard let filePath = filePath else {
+            return false
+        }
+        
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        
+        guard let fileURL = documentsURL?.appendingPathComponent(filePath) else {
+            return false
+        }
+        
+        return try self.prepareToPlay(fileURL: fileURL, time: time, persist: persist)
+    }
+    
+    @discardableResult
+    final public func prepareToPlay(fileURL: URL?, time: TimeInterval? = nil, persist: Bool = false) throws -> Bool {
+        guard let fileURL = fileURL else {
+            return false
+        }
+        
+        if (!FileManager.default.fileExists(atPath: fileURL.path)) {
+            return false
+        }
+        
+        return try self.prepareToPlay(url: fileURL, time: time, persist: persist)
+    }
+    
+    @discardableResult
+    final public func prepareToPlay(url: URL?, time: TimeInterval? = nil, persist: Bool = false) throws -> Bool {
+        guard let url = url else {
+            return false
+        }
+        
+        // Ignore prepare request if it's the actively playing file
+        if (self.player?.url == url) {
+            return false
+        }
+        
+        if (persist) {
+            self.player?.load(url: url, time: time)
+        } else {
+            self.stop()
+            self.clearNowPlayingInfo()
+            self.player?.removeObservers()
+            
+            self.player = HFMAudioPlayer(url: url, time: time)
+        }
+        
+        try self.setActive(true)
+        
+        return self.player != nil
+    }
+    
+    @objc
+    final public func requestAudioPlayerUpdate(shouldUpdateNowPlayingInfo: Bool = false) {
+        if (shouldUpdateNowPlayingInfo) {
+            self.updateNowPlayingInfo()
+        }
+        
+        if let player = self.player {
+            self.delegate?.onAudioPlayerUpdateRequested(player)
+        }
+        
+        if let syncInterval = self.syncInterval {
+            self.timeSinceLastSync += self.updateInterval
+            
+            if (self.timeSinceLastSync >= syncInterval) {
+                self.delegate?.onSyncRequested()
+                self.timeSinceLastSync = 0
+            }
+        }
+    }
+    
+    /// Updates MPNowPlayingInfoCenter.nowPlayingInfo on the MPMediaItemPropertyArtwork key.
+    /// Is called separately to account for asynchronous loading of the album artwork.
+    ///
+    /// - Parameter image: the album artwork to be displayed on the lock screen
+    final public func updateNowPlayingAlbumArt(image: UIImage?) {
+        guard let image = image, var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else {
+            return
+        }
+        
+        if #available(iOS 10.0, *) {
+            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size, requestHandler: { (size) -> UIImage in
+                return image
+            })
+        } else {
+            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(image: image)
+        }
+        
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+    
+    // MARK: Utilities (Private)
     
     private func addRemoteCommandHandlers() {
         let commandCenter = MPRemoteCommandCenter.shared()
@@ -253,111 +348,32 @@ class AudioManager {
         }
     }
     
-    func clearDownloads() throws {
-        guard let downloads = try self.getDownloads() else {
-            return
-        }
-        
-        for download in downloads {
-            try FileManager.default.removeItem(at: download)
-        }
-    }
-    
-    private func getDownloads() throws -> [URL]? {
-        guard let documentsURL =  FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        
-        return try FileManager.default.contentsOfDirectory(at: documentsURL, includingPropertiesForKeys: nil, options: [])
-    }
-    
-    @discardableResult
-    private func prepareToPlay(filePath: String?, time: TimeInterval? = nil, persist: Bool = false) throws -> Bool {
-        guard let filePath = filePath else {
-            return false
-        }
-        
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-        
-        guard let fileURL = documentsURL?.appendingPathComponent(filePath) else {
-            return false
-        }
-        
-        return try self.prepareToPlay(fileURL: fileURL, time: time, persist: persist)
-    }
-    
-    @discardableResult
-    private func prepareToPlay(fileURL: URL?, time: TimeInterval? = nil, persist: Bool = false) throws -> Bool {
-        guard let fileURL = fileURL else {
-            return false
-        }
-        
-        if (!FileManager.default.fileExists(atPath: fileURL.path)) {
-            return false
-        }
-        
-        return try self.prepareToPlay(url: fileURL, time: time, persist: persist)
-    }
-    
-    @discardableResult
-    private func prepareToPlay(url: URL?, time: TimeInterval? = nil, persist: Bool = false) throws -> Bool {
-        guard let url = url else {
-            return false
-        }
-        
-        // Ignore prepare request if it's the actively playing file
-        if (self.player?.url == url) {
-            return false
-        }
-        
-        if (persist) {
-            self.player?.load(url: url, time: time)
-        } else {
-            if (self.player?.isPlaying == true) {
-                self.stop()
-            }
-            
-            self.player = HFMAudioPlayer(url: url, time: time)
-        }
-        
-        try self.setActive(true)
-        
-        return self.player != nil
-    }
-    
-    private var timeSinceLastSync: TimeInterval = 0
-    
-    @objc func requestAudioPlayerUpdate() {
-        self.updateNowPlayingInfo()
-        
-        if let player = self.player {
-            self.delegate?.onAudioPlayerUpdateRequested(player)
-        }
-        
-        timeSinceLastSync += self.updateInterval
-        
-        if (timeSinceLastSync >= self.syncInterval) {
-            self.delegate?.onSyncRequested()
-            self.timeSinceLastSync = 0
-        }
+    private func clearNowPlayingInfo() {
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
     
     private func setActive(_ isActive: Bool) throws {
         try AVAudioSession.sharedInstance().setActive(isActive)
-        self.setNowPlaying()
+        self.setNowPlayingInfo()
+        self.requestAudioPlayerUpdate(shouldUpdateNowPlayingInfo: true)
     }
     
-    private func setNowPlaying() {
+    /// Sets the MPNowPlayingInfoCenter with values returned from HFMAudioManagerDelegate.getNowPlayingInfo
+    private func setNowPlayingInfo() {
         guard let info = self.delegate?.getNowPlayingInfo() else {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             return
         }
         
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
         
-        self.requestAudioPlayerUpdate()
+        self.delegate?.onNowPlayingAlbumArtRequested()
+        
+        self.requestAudioPlayerUpdate(shouldUpdateNowPlayingInfo: true)
     }
     
-    func startTimers() {
+    /// Starts the timer that fire HFMAudioManager.requestAudioPlayerUpdate which fires every second unless HFMAudioManager.updateInterval is changed.
+    private func startTimer() {
         self.updateTimer?.invalidate()
         
         guard let player = self.player else {
@@ -375,7 +391,8 @@ class AudioManager {
         }
     }
     
-    func stopTimers() {
+    /// Stops the timers that fire HFMAudioManager.requestAudioPlayerUpdate which fires every second unless HFMAudioManager.updateInterval is changed.
+    private func stopTimer() {
         self.updateTimer?.invalidate()
         self.updateTimer = nil
         
@@ -384,38 +401,37 @@ class AudioManager {
         }
     }
     
-    func updateNowPlayingAlbumArt(image: UIImage?) {
-        guard let image = image, var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else {
-            return
-        }
-        
-        if #available(iOS 10.0, *) {
-            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size, requestHandler: { (size) -> UIImage in
-                return image
-            })
-        } else {
-            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(image: image)
-        }
-        
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-    }
-    
-    func updateNowPlayingInfo() {
-        guard let player = self.player, var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else {
+    /// Updates MPNowPlayingInfoCenter.nowPlayingInfo with info relevant to the current instance of HFMAudioPlayer
+    private func updateNowPlayingInfo() {
+        guard let player = self.player  else {
                 return
+        }
+        
+        guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? self.getNowPlayingInfo() else {
+            return
         }
         
         info[MPNowPlayingInfoPropertyDefaultPlaybackRate] = 1.0
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = player.currentTime
         info[MPNowPlayingInfoPropertyPlaybackRate] = player.playbackRate
         
-        if #available(iOS 10.0, *) {
-            info[MPNowPlayingInfoPropertyPlaybackProgress] = Float(player.currentTime / player.duration)
+        if (player.duration > 0) {
+            info[MPMediaItemPropertyPlaybackDuration] = player.duration
+            
+            if #available(iOS 10.0, *) {
+                info[MPNowPlayingInfoPropertyPlaybackProgress] = Float(player.currentTime / player.duration)
+            }
         }
         
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
         
         self.delegate?.onNowPlayingInfoUpdated()
-        self.delegate?.onNowPlayingAlbumArtRequested()
     }
+    
+    open func getNowPlayingInfo() -> [String : Any]? { return nil }
+    open func onAudioPlayerUpdateRequested(_ player: HFMAudioPlayer) { }
+    open func onNowPlayingInfoUpdated() { }
+    open func onNowPlayingAlbumArtRequested() { }
+    open func onSyncRequested() { }
+    open func setProperties() { }
 }
