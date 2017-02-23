@@ -79,4 +79,4 @@ To be added.
 
 ## License
 
-ParkingPandaSDK is released under the MIT license. See LICENSE for details.
+HFMAudioPlayer is released under the MIT license. See LICENSE for details.
