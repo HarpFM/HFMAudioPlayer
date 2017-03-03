@@ -9,11 +9,36 @@
 import AVFoundation
 import Foundation
 
+public enum HFMAudioPlayerSource {
+    case downloadedFile
+    case stream
+}
+
+@objc public enum HFMAudioPlayerStatus: Int {
+    case unknown = 0
+    case loading
+    case playing //(source: HFMAudioPlayerSource)
+    case paused
+    case stopped
+    case readyToPlay
+}
+
 final public class HFMAudioPlayer: NSObject {
     // MARK: - Properties
     
     public var localPlayer: AVAudioPlayer?
     @objc public var streamPlayer: AVPlayer?
+    
+    public var availableDuration: TimeInterval {
+        if let player = self.localPlayer {
+            return player.duration
+        } else if let player = self.streamPlayer,
+            let range = player.currentItem?.loadedTimeRanges.first {
+            return CMTimeRangeGetEnd(range.timeRangeValue).seconds
+        } else {
+            return 0
+        }
+    }
     
     public var currentTime: TimeInterval {
         if let player = self.localPlayer {
@@ -73,6 +98,8 @@ final public class HFMAudioPlayer: NSObject {
         return self.getFormattedString(from: self.remainingTime)
     }
     
+    public dynamic var status: HFMAudioPlayerStatus = .unknown
+    
     private var timeToSeek: TimeInterval?
     
     public var url: URL? {
@@ -88,7 +115,7 @@ final public class HFMAudioPlayer: NSObject {
     
     // MARK: - Methods
     
-    // MARK: - Initializers
+    // MARK: Initializers
     
     public init(url: URL?, time: TimeInterval? = nil) {
         super.init()
@@ -96,7 +123,7 @@ final public class HFMAudioPlayer: NSObject {
         self.load(url: url, time: time)
     }
     
-    // MARK: - Overrides
+    // MARK: Overrides
     
     override public func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
         if (keyPath == #keyPath(streamPlayer.currentItem.status)) {
@@ -110,6 +137,7 @@ final public class HFMAudioPlayer: NSObject {
                 //                    HFMAudioManager.shared.play()
                 //                }
                 
+                self.status = .readyToPlay
                 self.removeObservers()
                 self.timeToSeek = nil
             }
@@ -117,6 +145,11 @@ final public class HFMAudioPlayer: NSObject {
     }
     
     // MARK: Utilities (Public)
+    
+    public func deinitialize() {
+        self.stop()
+        self.removeObservers()
+    }
     
     public func removeObservers() {
         guard (self.timeToSeek != nil) else {
@@ -148,6 +181,7 @@ final public class HFMAudioPlayer: NSObject {
             self.localPlayer = nil
             self.streamPlayer = AVPlayer(url: url)
             
+            self.status = .loading
             self.timeToSeek = time
             self.addObserver(self, forKeyPath: #keyPath(streamPlayer.currentItem.status), options: [.old, .new], context: nil)
         }
@@ -165,23 +199,32 @@ final public class HFMAudioPlayer: NSObject {
         } else if let player = self.streamPlayer {
             player.pause()
         }
+        
+        self.status = .paused
     }
     
     public func play() {
         if let player = self.localPlayer {
             player.play()
+//            self.status = .playing(source: .downloadedFile)
+            
         } else if let player = self.streamPlayer {
             player.play()
             
             if #available(iOS 10.0, *) {
                 player.playImmediately(atRate: self.playbackRate)
             }
+            
+//            self.status = .playing(source: .stream)
         }
+        
+        self.status = .playing
     }
     
     public func prepareToPlay() {
         if let player = self.localPlayer {
             player.prepareToPlay()
+            self.status = .readyToPlay
         }
     }
     
@@ -201,6 +244,10 @@ final public class HFMAudioPlayer: NSObject {
             player.currentTime = time
             completion?()
         } else if let player = self.streamPlayer {
+            guard (player.status == .readyToPlay) else {
+                return
+            }
+             
             let newTime = CMTime(seconds: time, preferredTimescale: player.currentTime().timescale)
 //            player.currentItem?.seek(to: newTime)
             player.seek(to: newTime, toleranceBefore: kCMTimeZero, toleranceAfter: kCMTimeZero) { _ in
@@ -238,6 +285,8 @@ final public class HFMAudioPlayer: NSObject {
             // TODO: No stop method for AVPlayer?
             player.pause()
         }
+        
+        self.status = .stopped
     }
     
     @discardableResult
@@ -269,5 +318,9 @@ final public class HFMAudioPlayer: NSObject {
         } else {
             return String(format: "%01d:%02d:%02d", hours, minutes, seconds)
         }
+    }
+    
+    deinit {
+        print("Audio Player deinitialized")
     }
 }

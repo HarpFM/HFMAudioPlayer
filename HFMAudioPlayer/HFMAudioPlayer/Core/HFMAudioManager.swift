@@ -10,7 +10,7 @@ import AVFoundation
 import Foundation
 import MediaPlayer
 
-open class HFMAudioManager: HFMAudioManagerDelegate {
+open class HFMAudioManager: NSObject, HFMAudioManagerDelegate {
     // MARK: - Shared Instance
     
     private static var _shared: HFMAudioManager!
@@ -32,6 +32,8 @@ open class HFMAudioManager: HFMAudioManagerDelegate {
     
     // MARK: - Properties
     
+    open var audioSessionCategory: String = AVAudioSessionCategoryPlayback
+    open var audioSessionMode: String = AVAudioSessionModeDefault
     open var delegate: HFMAudioManagerDelegate?
     open var isDebugEnabled = false
     open var supportedPlaybackRates: [NSNumber] = [1, 1.5, 2]
@@ -40,18 +42,28 @@ open class HFMAudioManager: HFMAudioManagerDelegate {
     open var syncInterval: TimeInterval?
     open var updateInterval: TimeInterval = 1
     
-    final public var player: HFMAudioPlayer?
-    
-    public var shouldPauseWhenExternalDeviceChanges = true {
-        didSet {
-            if (self.shouldPauseWhenExternalDeviceChanges) {
-                NotificationCenter.default.addObserver(self, selector: #selector(self.onAudioSessionRouteChanged), name: NSNotification.Name.AVAudioSessionRouteChange, object: nil)
-            } else {
-                NotificationCenter.default.removeObserver(self, name: NSNotification.Name.AVAudioSessionRouteChange, object: nil)
-            }
+    public dynamic var player: HFMAudioPlayer? {
+        willSet {
+            self.player?.deinitialize()
         }
     }
     
+//    // TODO: This whole block doesn't make sense
+//    public var shouldPauseWhenExternalDeviceChanges = true {
+//        didSet {
+//            if (self.shouldPauseWhenExternalDeviceChanges) {
+//                NotificationCenter.default.addObserver(self, selector: #selector(self.onAudioSessionRouteChanged), name: NSNotification.Name.AVAudioSessionRouteChange, object: nil)
+//                NotificationCenter.default.addObserver(self, selector: #selector(self.onAudioSessionInterrupted), name: NSNotification.Name.AVAudioSessionInterruption, object: nil)
+//                NotificationCenter.default.addObserver(self, selector: #selector(self.onAudioPlayerDidFinishPlaying), name: NSNotification.Name.AVPlayerItemDidPlayToEndTime, object: nil)
+//            } else {
+//                NotificationCenter.default.removeObserver(self, name: NSNotification.Name.AVAudioSessionRouteChange, object: nil)
+//                NotificationCenter.default.removeObserver(self, name: NSNotification.Name.AVAudioSessionInterruption, object: nil)
+//                NotificationCenter.default.removeObserver(self, name: NSNotification.Name.AVPlayerItemDidPlayToEndTime, object: nil)
+//            }
+//        }
+//    }
+    
+    private var shouldResumeAfterInterruption: Bool = false
     private var timeSinceLastSync: TimeInterval = 0
     private var updateTimer: Timer?
     
@@ -59,21 +71,59 @@ open class HFMAudioManager: HFMAudioManagerDelegate {
     
     // MARK: Initializers
     
-    public init() {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryPlayback)
-            try AVAudioSession.sharedInstance().setActive(false)
-        } catch {
-            print(error.localizedDescription)
-        }
-        
-        self.addRemoteCommandHandlers()
+    public override init() {
+        super.init()
         
         self.delegate = self
         self.delegate?.setProperties()
+        
+        self.addRemoteCommandHandlers()
+        self.setAudioSession()
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(self.onAudioSessionRouteChanged), name: NSNotification.Name.AVAudioSessionRouteChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.onAudioSessionInterrupted), name: NSNotification.Name.AVAudioSessionInterruption, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.onAudioPlayerDidFinishPlaying), name: NSNotification.Name.AVPlayerItemDidPlayToEndTime, object: nil)
+        
+        self.addObserver(self, forKeyPath: #keyPath(player.status), options: [.old, .new], context: nil)
+    }
+    
+    // MARK: Overrides
+    
+    override open func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        if (keyPath == #keyPath(player.status)) {
+            self.onAudioPlayerStatusChanged(status: self.player?.status)
+        }
     }
     
     // MARK: Events
+    
+    @objc
+    private func onAudioPlayerDidFinishPlaying(notification: Notification) {
+        var q = ""
+    }
+    
+    @objc
+    private func onAudioSessionInterrupted(notification: Notification) {
+//        if let options = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt {
+//            if (options == AVAudioSessionInterruptionOptions.shouldResume) {
+//                var a = ""
+//            }
+//        }
+        
+        guard let type = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt else {
+            return
+        }
+        
+        if (type == AVAudioSessionInterruptionType.began.rawValue) {
+            self.shouldResumeAfterInterruption = self.player?.status == .playing
+        } else if (type == AVAudioSessionInterruptionType.ended.rawValue) {
+            if (self.shouldResumeAfterInterruption) {
+                try? self.setActive(true)
+                self.play()
+                self.shouldResumeAfterInterruption = false
+            }
+        }
+    }
     
     @objc
     private func onAudioSessionRouteChanged(notification: Notification) {
@@ -219,9 +269,7 @@ open class HFMAudioManager: HFMAudioManagerDelegate {
         if (persist) {
             self.player?.load(url: url, time: time)
         } else {
-            self.stop()
             self.clearNowPlayingInfo()
-            self.player?.removeObservers()
             
             self.player = HFMAudioPlayer(url: url, time: time)
         }
@@ -248,6 +296,16 @@ open class HFMAudioManager: HFMAudioManagerDelegate {
                 self.delegate?.onSyncRequested()
                 self.timeSinceLastSync = 0
             }
+        }
+    }
+    
+    open func setAudioSession() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(self.audioSessionCategory, with: [])
+            try AVAudioSession.sharedInstance().setMode(self.audioSessionMode)
+            try AVAudioSession.sharedInstance().setActive(false)
+        } catch {
+            print(error.localizedDescription)
         }
     }
     
@@ -429,6 +487,7 @@ open class HFMAudioManager: HFMAudioManagerDelegate {
     }
     
     open func getNowPlayingInfo() -> [String : Any]? { return nil }
+    open func onAudioPlayerStatusChanged(status: HFMAudioPlayerStatus?) {}
     open func onAudioPlayerUpdateRequested(_ player: HFMAudioPlayer) { }
     open func onNowPlayingInfoUpdated() { }
     open func onNowPlayingAlbumArtRequested() { }

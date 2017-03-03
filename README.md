@@ -4,7 +4,9 @@
 [![CocoaPods Compatible](https://img.shields.io/cocoapods/v/HFMAudioPlayer.svg)](https://cocoapods.org/pods/HFMAudioPlayer)
 [![Platform](https://img.shields.io/cocoapods/p/HFMAudioPlayer.svg)](http://cocoadocs.org/docsets/HFMAudioPlayer)
 
-**HFMAudioPlayer** seamless combines AVAudioPlayer and AVPlayer under one roof so you don't have to fight with multiple SDKs. In addition to this, it adds utility methods, an optional event manager, and method hooks for external device control.
+**HFMAudioPlayer** seamlessly combines AVAudioPlayer and AVPlayer under one roof so you don't have to fight with multiple implementations for playing audio files locally or streaming over the internet. In addition to this, it adds utility methods, an optional event manager, and method hooks for external device control.
+
+**NOTE: HFMAudioPlayer is optimized for the podcast app, HarpFM. I have not yet gone through the proper steps to make this a more generic drop-in class. As such, it is lacking a good degree of customization, but I'm happy to clean it up if there is any interest. Send me a message!**
 
 - [Features](#features)
 - [Requirements](#requirements)
